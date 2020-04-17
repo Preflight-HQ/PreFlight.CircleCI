@@ -1,0 +1,183 @@
+
+# This code is licensed from CircleCI to the user under the MIT license. See
+# https://circleci.com/orbs/registry/licensing for details.
+version: 2.1
+
+description: | 
+  Execute your Preflight tests within your CircleCI build. 
+examples:
+  run-tests:
+    description: Example of Preflight test execution.
+    usage:
+      version: 2.1
+      orbs:
+        preflight: preflight/test-runner@1.0.1
+      jobs:
+        build:
+          docker: 
+            - image: circleci/node:9.0.0
+          steps:
+            - preflight/run-tests:
+                clientId: '<preflight-client-id>'
+                clientSecret: '<preflight-client-secret>'
+                groupId: '<test-group-id>'
+                environmentId: '<test-environment-id>'
+                platforms: '[{ "platform": "windows", "browser": "chrome" }]'
+                sizes: '[{"width":1440,"height":900}]'
+                captureScreenshots: true
+                waitResults: false
+orbs:
+  internal:
+    commands:
+      execute:
+        description: Trigger your Preflight tests with given paramaters.
+        parameters:
+          clientId:
+            type: string
+            description: Client Id for Preflight API.
+            default: $PF_CLIENT_ID
+          clientSecret:
+            type: string
+            description: Client Secret for Preflight API.
+            default: $PF_CLIENT_SECRET
+          groupId:
+            type: string
+            description: Preflight test group id.
+          environmentId:
+            type: string
+            description: (optional) Preflight environment id
+            default: ""
+          platforms:
+            type: string
+            description: (optional) Platform(s) and browser(s) you want to run your Preflight test(s)
+            default: '[]'
+          sizes:
+            type: string
+            description: (optional) Size(s) you want to run your Preflight test(s)
+            default: '[]'
+          captureScreenshots:
+            type: boolean
+            description: (optional) Capture screenshots enables taking screenhots of the each step.
+            default: true
+          waitResults:
+            type: boolean
+            description: (optional) Wait Preflight test result(s). If you set it as true, your CircleCI build waits your Preflight test result(s). 
+            default: false
+        steps:
+          - run:
+              name: Run tests
+              command: |
+                TOKEN_URL="https://auth.preflight.com/connect/token"
+                CLIENT_ID="<< parameters.clientId >>"
+                CLIENT_SECRET="<< parameters.clientSecret >>"
+                TOKEN_REQUEST_BODY="client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&grant_type=client_credentials&scope=tests_run"
+
+                TOKEN_RESULT=$(curl -k -s -XPOST -H"Content-Type: application/x-www-form-urlencoded" -d"$TOKEN_REQUEST_BODY" "$TOKEN_URL")
+                ACCESS_TOKEN=$(echo $TOKEN_RESULT | jq -r '.access_token')
+
+                echo "Access Token : $ACCESS_TOKEN"
+
+                API_RUN_URL="https://api.preflight.com/v1/Tests/Run"
+                RUN_REQUEST_BODY='{
+                    "groupId":"<< parameters.groupId >>",
+                    "platforms":<< parameters.platforms >>,
+                    "sizes":<< parameters.sizes >>,
+                    "captureScreenshots":<< parameters.captureScreenshots >>
+                }'
+                ENVIRONMENT_ID="<< parameters.environmentId >>"
+                if [ -n "$ENVIRONMENT_ID" ]  #if environment id is not null
+                then 
+                  RUN_REQUEST_BODY=$(echo $RUN_REQUEST_BODY | jq -r --arg ENVID $ENVIRONMENT_ID '. += {environmentId: $ENVID}')
+                fi
+                echo "$RUN_REQUEST_BODY"
+
+                TEST_RESULT=$(curl -s -XPOST -H"Content-Type: application/json" -H"Authorization: bearer $ACCESS_TOKEN" -d"$RUN_REQUEST_BODY" "$API_RUN_URL")
+                TEST_RUN_ID=$(echo $TEST_RESULT | jq -r '.testRunId')
+
+                if [ -z "$TEST_RUN_ID" ]  #if test run id is null
+                then 
+                    echo "The test run has been failed."
+                    exit 1
+                fi
+                echo "The test(s) has been successfully queued.TestRunId : $TEST_RUN_ID"
+
+                WAIT_RESULTS=<< parameters.waitResults >>
+                if [ "$WAIT_RESULTS" = true ] 
+                then
+                    echo "Waiting for test result(s)"
+                    API_STATUS_URL="https://api.preflight.com/v1/Tests/Run/$TEST_RUN_ID"
+                    
+                    WAIT=true
+                    while [ "$WAIT" = true ]
+                    do
+                        TEST_RUN_RESULT=$(curl -s -H"Authorization: bearer $ACCESS_TOKEN" "$API_STATUS_URL")
+                        echo "$TEST_RUN_RESULT"
+
+                        FAILED=$( echo "$TEST_RUN_RESULT" | jq -r '.results[] | select(.status == "Failed")')
+                        if [ -n "$FAILED" ]  #if failed test exist
+                        then 
+                            echo "Below test(s) failed."
+                            echo "$FAILED"
+                            exit 1
+                        fi
+
+                        WAITING=$( echo "$TEST_RUN_RESULT" | jq -r '.results[] | select(.status == ("Queued","Running"))')
+
+                        if [ -n "$WAITING" ]  #if waiting test exist
+                        then
+                            echo "Waiting for all the tests to be completed."
+                        else
+                            echo "All test(s) successfully completed."
+                            exit 0
+                        fi
+                        sleep 5
+                    done
+                else
+                    exit 0
+                fi
+commands:
+  run-tests:
+    description: |
+      Trigger your test from a CircleCI build
+    parameters:
+      clientId:
+        type: string
+        description: Client Id for Preflight API.
+        default: $PF_CLIENT_ID
+      clientSecret:
+        type: string
+        description: Client Secret for Preflight API.
+        default: $PF_CLIENT_SECRET
+      groupId:
+        type: string
+        description: Preflight test group id.
+      environmentId:
+        type: string
+        description: (optional) Preflight environment id
+        default: ""
+      platforms:
+        type: string
+        description: (optional) Platform(s) and browser(s) you want to run your Preflight test(s)
+        default: '[]'
+      sizes:
+        type: string
+        description: (optional) Size(s) you want to run your Preflight test(s)
+        default: '[]'
+      captureScreenshots:
+        type: boolean
+        description: (optional) Capture screenshots enables taking screenhots of the each step.
+        default: true
+      waitResults:
+        type: boolean
+        description: (optional) Wait Preflight test result(s). If you set it as true, your CircleCI build waits your Preflight test result(s). 
+        default: false
+    steps:
+      - internal/execute:
+          clientId: << parameters.clientId >>
+          clientSecret: << parameters.clientSecret >>
+          groupId: << parameters.groupId >>
+          environmentId: << parameters.environmentId >>
+          platforms: << parameters.platforms >>
+          sizes: << parameters.sizes >>
+          captureScreenshots: << parameters.captureScreenshots >>
+          waitResults: << parameters.waitResults >>

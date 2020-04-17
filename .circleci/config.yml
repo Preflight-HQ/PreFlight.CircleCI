@@ -1,0 +1,12 @@
+version: 2.1
+orbs:
+  preflight: preflight/test-runner@1.0.1
+jobs:
+  build:
+    docker: 
+      - image: circleci/node:9.0.0
+    steps:
+      - preflight/run-tests:
+          groupId: '1zQwQmdfEiYA'
+          waitResults: true
+          
