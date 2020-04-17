@@ -40,8 +40,8 @@ jobs:
 `platforms (optional)` : Platforms and browsers you want to run your Preflight tests.  
   * Example usage `[{ "platform": "windows", "browser": "chrome" }]`
   * You can pass more than one browser option. Ex. `[{ "platform": "windows", "browser": "chrome" }, { "platform": "windows", "browser": "firefox" }]`
-  * Platform options : `"windows"`, `"mac"(Temporary out of service)`
-  * Browser options : `"chrome"`, `"internetexplorer"`, `"edge"`, `"firefox"`, `"safari"(Temporary out of service)`
+  * Platform options : `"windows"`
+  * Browser options : `"chrome"`, `"internetexplorer"`, `"edge"`, `"firefox"`
 
 `sizes (optional)` :  Size you want to run your Preflight tests.
   * Example usage `[{"width":1440,"height":900}]`
