@@ -12,7 +12,7 @@ This is full example configuration
 ```
 version: 2.1
 orbs:
-  preflight: preflight/test-runner@1.0.1
+  preflight: preflight/test-runner@1.0.3
 jobs:
   build:
     docker: 
@@ -21,10 +21,11 @@ jobs:
       - preflight/run-tests:
           clientId: '<preflight-client-id>'
           clientSecret: '<preflight-client-secret>'
+          testId: '<test-id>'
           groupId: '<test-group-id>'
           environmentId: '<test-environment-id>'
-          platforms: '[{ "platform": "windows", "browser": "chrome" }]'
-          sizes: '[{"width":1440,"height":900}]'
+          platforms: 'win-chrome,win-ie'
+          sizes: '1920x1080,1440x900'
           captureScreenshots: true
           waitResults: false
 ```
@@ -33,24 +34,26 @@ jobs:
  
 `clientSecret (optional)` : Preflight Client Secret. You can pass as a paramater or you can add it as an environment variable under your CircleCI account. Environment name should be `PF_CLIENT_SECRET`. This is optional if you set a client secret environment variable under your CircleCI account. Otherwise you should pass it as a parameter.
 
-`groupId (required)` : Preflight group id. You can get it from [Test Settings > Groups](https://app.preflight.com/tests/settings/groups) under your Preflight account.
+`testId (optional)` : Pass the Test Id to run. If test id or group id are not passed all the tests will be run.
 
-`environmentId (optional)` : Preflight environment id. You can get it from [Test Settings > Environments](https://app.preflight.com/tests/settings/environments) under your Preflight account.
+`groupId (optional)` : Pass the Group Id to run. If test id or group id are not passed all the tests will be run. You can get it from [Test Settings > Groups](https://app.preflight.com/tests/settings/groups) under your PreFlight account.
 
-`platforms (optional)` : Platforms and browsers you want to run your Preflight tests.  
-  * Example usage `[{ "platform": "windows", "browser": "chrome" }]`
-  * You can pass more than one browser option. Ex. `[{ "platform": "windows", "browser": "chrome" }, { "platform": "windows", "browser": "firefox" }]`
-  * Platform options : `"windows"`
-  * Browser options : `"chrome"`, `"internetexplorer"`, `"edge"`, `"firefox"`
+`environmentId (optional)` : Environment ID for your test group. You can get it from [Test Settings > Environments](https://app.preflight.com/tests/settings/environments) under your PreFlight account.
 
-`sizes (optional)` :  Size you want to run your Preflight tests.
-  * Example usage `[{"width":1440,"height":900}]`
-  * You can pass more than one size option. Ex. `[{"width":1920,"height":1080}, {"width":1440,"height":900}]`
-  * Size options : `{"width":1920,"height":1080}` `{"width":1440,"height":900}` `{"width":1024,"height":768}` `{"width":480,"height":640}`
+`platforms (optional)` : Platforms and browsers you want to run your PreFlight tests.  
+  * Example usage `win-chrome`
+  * You can pass more than one browser option. Ex. `win-chrome, win-firefox`
+  * Platform options : `win`
+  * Browser options : `chrome`, `ie`, `edge`, `firefox`
 
-`captureScreenshots (optional)` :  Enables taking screenhots of the each step. Default value is `true`
+`sizes (optional)` :  Size you want to run your PreFlight tests.
+  * Example usage. (WidthxHeight) `1440x900`
+  * You can pass more than one size option. Ex. `1920x1080, 1440x900`
+  * Size options : `1920x1080, 1440x900, 1024x768, 480x640`
 
-`waitResults (optional)` :  If you set it as `true`, your CircleCI build waits your Preflight test results. Default value is `false`
+`captureScreenshots (optional)` :  Enables taking screenhots of the each step.
+
+`waitResults (optional)` :  If you set it as `true`, your build waits your PreFlight test results.
 
 
 ## Developer Notes
@@ -77,5 +80,5 @@ If you need to change something in the orb.yml file, you can follow below steps 
   1. Open a terminal and navigate to your source code.
   
   2. Run this command to publish CircleCI Registry.
-      `circleci orb publish orb.yml preflight/test-runner@1.0.0`
+      `circleci orb publish orb.yml preflight/test-runner@<version-number>`
 

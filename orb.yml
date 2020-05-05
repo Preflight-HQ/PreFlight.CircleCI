@@ -4,14 +4,14 @@
 version: 2.1
 
 description: | 
-  Execute your Preflight tests within your CircleCI build. 
+  Execute your PreFlight tests within your CircleCI build. 
 examples:
   run-tests:
-    description: Example of Preflight test execution.
+    description: Example of PreFlight test execution.
     usage:
       version: 2.1
       orbs:
-        preflight: preflight/test-runner@1.0.1
+        preflight: preflight/test-runner@1.0.3
       jobs:
         build:
           docker: 
@@ -20,40 +20,46 @@ examples:
             - preflight/run-tests:
                 clientId: '<preflight-client-id>'
                 clientSecret: '<preflight-client-secret>'
+                testId: '<test-id>'
                 groupId: '<test-group-id>'
                 environmentId: '<test-environment-id>'
-                platforms: '[{ "platform": "windows", "browser": "chrome" }]'
-                sizes: '[{"width":1440,"height":900}]'
+                platforms: 'win-chrome,win-ie'
+                sizes: '1920x1080,1440x900'
                 captureScreenshots: true
                 waitResults: false
 orbs:
   internal:
     commands:
       execute:
-        description: Trigger your Preflight tests with given paramaters.
+        description: Trigger your PreFlight tests with given paramaters.
         parameters:
           clientId:
             type: string
-            description: Client Id for Preflight API.
+            description: Client Id for PreFlight API.
             default: $PF_CLIENT_ID
           clientSecret:
             type: string
-            description: Client Secret for Preflight API.
+            description: Client Secret for PreFlight API.
             default: $PF_CLIENT_SECRET
+          testId:
+            type: string
+            description: (optional) PreFlight test id.
+            default: ""
           groupId:
             type: string
-            description: Preflight test group id.
+            description: (optional) PreFlight test group id.
+            default: ""
           environmentId:
             type: string
-            description: (optional) Preflight environment id
+            description: (optional) PreFlight environment id
             default: ""
           platforms:
             type: string
-            description: (optional) Platform(s) and browser(s) you want to run your Preflight test(s)
+            description: (optional) Platform(s) and browser(s) you want to run your PreFlight test(s)
             default: '[]'
           sizes:
             type: string
-            description: (optional) Size(s) you want to run your Preflight test(s)
+            description: (optional) Size(s) you want to run your PreFlight test(s)
             default: '[]'
           captureScreenshots:
             type: boolean
@@ -61,60 +67,139 @@ orbs:
             default: true
           waitResults:
             type: boolean
-            description: (optional) Wait Preflight test result(s). If you set it as true, your CircleCI build waits your Preflight test result(s). 
-            default: false
+            description: (optional) Wait PreFlight test result(s). If you set it as true, your CircleCI build waits your PreFlight test result(s). 
+            default: true
         steps:
           - run:
               name: Run tests
               command: |
-                TOKEN_URL="https://auth.preflight.com/connect/token"
-                CLIENT_ID="<< parameters.clientId >>"
-                CLIENT_SECRET="<< parameters.clientSecret >>"
-                TOKEN_REQUEST_BODY="client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&grant_type=client_credentials&scope=tests_run"
+                  function GetPlatformAndBrowser(){
+                    PLATFORM_JSON="" 
+                    PLATFORM="$(echo $1 | cut -d "-" -f 1)"
+                    PLATFORM_LOWERCASE=$(echo ${PLATFORM,,})
+                    PLATFORM_NO_WHITESPACE=$(echo -e "${PLATFORM_LOWERCASE}" | tr -d '[:space:]')
+                    case $PLATFORM_NO_WHITESPACE in
+                      win)
+                        PLATFORM_JSON="windows" ;;
+                      *)
+                        echo "Invalid platform."
+                        exit 1 ;;
+                    esac
 
-                TOKEN_RESULT=$(curl -k -s -XPOST -H"Content-Type: application/x-www-form-urlencoded" -d"$TOKEN_REQUEST_BODY" "$TOKEN_URL")
-                ACCESS_TOKEN=$(echo $TOKEN_RESULT | jq -r '.access_token')
+                    BROWSER_JSON="" 
+                    BROWSER="$(echo $1 | cut -d "-" -f 2)"
+                    BROWSER_LOWERCASE=$(echo ${BROWSER,,})
+                    BROWSER_NO_WHITESPACE=$(echo -e "${BROWSER_LOWERCASE}" | tr -d '[:space:]')
+                    case $BROWSER_NO_WHITESPACE in
+                      ie)
+                        BROWSER_JSON="internetexplorer" ;;
+                      edge | firefox | chrome )
+                        BROWSER_JSON=$BROWSER_NO_WHITESPACE ;;       
+                      *)
+                        echo "Invalid browser."
+                        exit 1 ;;
+                    esac
 
-                echo "Access Token : $ACCESS_TOKEN"
+                    local JSON_STRING=$( jq -r -n --arg pl "$PLATFORM_JSON" --arg br "$BROWSER_JSON" '{"platform": $pl, "browser": $br}' )
+                    echo $JSON_STRING
+                  }
 
-                API_RUN_URL="https://api.preflight.com/v1/Tests/Run"
-                RUN_REQUEST_BODY='{
-                    "groupId":"<< parameters.groupId >>",
-                    "platforms":<< parameters.platforms >>,
-                    "sizes":<< parameters.sizes >>,
-                    "captureScreenshots":<< parameters.captureScreenshots >>
-                }'
-                ENVIRONMENT_ID="<< parameters.environmentId >>"
-                if [ -n "$ENVIRONMENT_ID" ]  #if environment id is not null
-                then 
+                  function GetSize(){
+                    WIDTH="$(echo $1 | cut -d "x" -f 1)"
+                    WIDTH_NO_WHITESPACE="$(echo -e "${WIDTH}" | tr -d '[:space:]')"
+
+                    HEIGHT="$(echo $1 | cut -d "x" -f 2)"
+                    HEIGHT_NO_WHITESPACE="$(echo -e "${HEIGHT}" | tr -d '[:space:]')"
+
+                    local JSON_STRING=$( jq -n --arg wdth "$WIDTH_NO_WHITESPACE" --arg hght "$HEIGHT_NO_WHITESPACE" '{"width": $wdth, "height": $hght}' );
+                    echo $JSON_STRING
+                  }
+
+                  CLIENT_ID="<< parameters.clientId >>"
+                  CLIENT_SECRET="<< parameters.clientSecret >>"
+                  TEST_ID="<< parameters.testId >>"
+                  GROUP_ID="<< parameters.groupId >>"
+                  ENVIRONMENT_ID="<< parameters.environmentId >>"
+                  PLATFORMS="<< parameters.platforms >>"
+                  SIZES="<< parameters.sizes >>"
+                  WAIT_RESULTS=<< parameters.waitResults >>
+                  CAPTURE_SCREENSHOTS=<< parameters.captureScreenshots >>
+
+                  API_URL="https://api.preflight.com/v1/tests"
+                  TOKEN_URL="https://auth.preflight.com/connect/token"
+
+                  TOKEN_REQUEST_BODY="client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&grant_type=client_credentials&scope=tests_run"
+                  TOKEN_RESULT=$(curl -k -s -XPOST -H"Content-Type: application/x-www-form-urlencoded" -d"$TOKEN_REQUEST_BODY" "$TOKEN_URL")
+                  ACCESS_TOKEN=$(echo $TOKEN_RESULT | jq -r '.access_token')
+
+                  echo "Access Token : $ACCESS_TOKEN"
+
+                  RUN_REQUEST_BODY='{
+                    "platforms":[],
+                    "sizes":[],
+                    "captureScreenshots":'"$CAPTURE_SCREENSHOTS"'
+                  }'
+
+                  PLATFORM_BROWSER_LIST=()
+                  if [ -n "$PLATFORMS" ]
+                  then 
+                  for PLATFORM_BROWSER in $(echo $PLATFORMS | tr "," "\n")
+                  do
+                    RES=$(GetPlatformAndBrowser "$PLATFORM_BROWSER")
+                    RUN_REQUEST_BODY=$(echo $RUN_REQUEST_BODY | jq --argjson RES "$RES" '.platforms |= .+ [$RES]' )
+                  done
+                  fi
+
+                  SIZES_ARRAY=()
+                  if [ -n "$SIZES" ]
+                  then 
+                  for SIZE in $(echo $SIZES | tr "," "\n")
+                  do
+                    RES=$(GetSize "$SIZE")
+                    RUN_REQUEST_BODY=$(echo $RUN_REQUEST_BODY | jq --argjson RES "$RES" '.sizes |= .+ [$RES]' )
+                  done
+                  fi
+
+                  REQUEST_PATH=""
+                  if [ -n "$TEST_ID" ]
+                  then 
+                  REQUEST_PATH=$TEST_ID"/Run"
+                  elif [ -n "$GROUP_ID" ]
+                  then 
+                  REQUEST_PATH="Run"
+                  RUN_REQUEST_BODY=$(echo $RUN_REQUEST_BODY | jq -r --arg GRPID $GROUP_ID '. += {groupId: $GRPID}')
+                  fi
+
+                  if [ -n "$ENVIRONMENT_ID" ]
+                  then 
                   RUN_REQUEST_BODY=$(echo $RUN_REQUEST_BODY | jq -r --arg ENVID $ENVIRONMENT_ID '. += {environmentId: $ENVID}')
-                fi
-                echo "$RUN_REQUEST_BODY"
+                  fi
 
-                TEST_RESULT=$(curl -s -XPOST -H"Content-Type: application/json" -H"Authorization: bearer $ACCESS_TOKEN" -d"$RUN_REQUEST_BODY" "$API_RUN_URL")
-                TEST_RUN_ID=$(echo $TEST_RESULT | jq -r '.testRunId')
+                  echo "$RUN_REQUEST_BODY"
+                  TEST_RESULT=$(curl -s -XPOST -H"Content-Type: application/json" -H"Authorization: bearer $ACCESS_TOKEN" -d"$RUN_REQUEST_BODY" "$API_URL/$REQUEST_PATH")
+                  echo "$TEST_RESULT"
 
-                if [ -z "$TEST_RUN_ID" ]  #if test run id is null
-                then 
+                  TEST_RUN_ID=$(echo $TEST_RESULT | jq -r '.testRunId')
+
+                  if [ -z "$TEST_RUN_ID" ]
+                  then 
                     echo "The test run has been failed."
                     exit 1
-                fi
-                echo "The test(s) has been successfully queued.TestRunId : $TEST_RUN_ID"
+                  fi
+                  echo "The test(s) has been successfully queued.TestRunId : $TEST_RUN_ID"
 
-                WAIT_RESULTS=<< parameters.waitResults >>
-                if [ "$WAIT_RESULTS" = true ] 
-                then
+                  if [ "$WAIT_RESULTS" = true ] 
+                  then
                     echo "Waiting for test result(s)"
-                    API_STATUS_URL="https://api.preflight.com/v1/Tests/Run/$TEST_RUN_ID"
                     
                     WAIT=true
                     while [ "$WAIT" = true ]
                     do
-                        TEST_RUN_RESULT=$(curl -s -H"Authorization: bearer $ACCESS_TOKEN" "$API_STATUS_URL")
+                        TEST_RUN_RESULT=$(curl -s -H"Authorization: bearer $ACCESS_TOKEN" "$API_URL/run/$TEST_RUN_ID")
                         echo "$TEST_RUN_RESULT"
 
                         FAILED=$( echo "$TEST_RUN_RESULT" | jq -r '.results[] | select(.status == "Failed")')
-                        if [ -n "$FAILED" ]  #if failed test exist
+                        if [ -n "$FAILED" ]
                         then 
                             echo "Below test(s) failed."
                             echo "$FAILED"
@@ -123,7 +208,7 @@ orbs:
 
                         WAITING=$( echo "$TEST_RUN_RESULT" | jq -r '.results[] | select(.status == ("Queued","Running"))')
 
-                        if [ -n "$WAITING" ]  #if waiting test exist
+                        if [ -n "$WAITING" ]
                         then
                             echo "Waiting for all the tests to be completed."
                         else
@@ -132,9 +217,9 @@ orbs:
                         fi
                         sleep 5
                     done
-                else
+                  else
                     exit 0
-                fi
+                  fi
 commands:
   run-tests:
     description: |
@@ -142,39 +227,45 @@ commands:
     parameters:
       clientId:
         type: string
-        description: Client Id for Preflight API.
+        description: Client Id for PreFlight API.
         default: $PF_CLIENT_ID
       clientSecret:
         type: string
-        description: Client Secret for Preflight API.
+        description: Client Secret for PreFlight API.
         default: $PF_CLIENT_SECRET
+      testId:
+        type: string
+        description: (optional) PreFlight test id.
+        default: ""
       groupId:
         type: string
-        description: Preflight test group id.
+        description: (optional) PreFlight test group id.
+        default: ""
       environmentId:
         type: string
-        description: (optional) Preflight environment id
+        description: (optional) PreFlight environment id
         default: ""
       platforms:
         type: string
-        description: (optional) Platform(s) and browser(s) you want to run your Preflight test(s)
-        default: '[]'
+        description: (optional) Platform(s) and browser(s) you want to run your PreFlight test(s)
+        default: ""
       sizes:
         type: string
-        description: (optional) Size(s) you want to run your Preflight test(s)
-        default: '[]'
+        description: (optional) Size(s) you want to run your PreFlight test(s)
+        default: ""
       captureScreenshots:
         type: boolean
         description: (optional) Capture screenshots enables taking screenhots of the each step.
         default: true
       waitResults:
         type: boolean
-        description: (optional) Wait Preflight test result(s). If you set it as true, your CircleCI build waits your Preflight test result(s). 
-        default: false
+        description: (optional) Wait PreFlight test result(s). If you set it as true, your CircleCI build waits your PreFlight test result(s). 
+        default: true
     steps:
       - internal/execute:
           clientId: << parameters.clientId >>
           clientSecret: << parameters.clientSecret >>
+          testId: << parameters.testId >>
           groupId: << parameters.groupId >>
           environmentId: << parameters.environmentId >>
           platforms: << parameters.platforms >>

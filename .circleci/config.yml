@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  preflight: preflight/test-runner@1.0.1
+  preflight: preflight/test-runner@1.0.3
 jobs:
   build:
     docker: 
