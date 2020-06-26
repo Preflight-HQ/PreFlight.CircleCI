@@ -6,37 +6,69 @@ This documentation provides you, how to run or trigger your Preflight tests usin
 ## Prerequisites
 To access Preflight api and run your Preflight tests, you need to get a Preflight Client Id and Client Secret from [Account Settings > API](https://app.preflight.com/account-settings/api) under your Preflight account.
 
+`Client Id` : You should add it as an environment variable under your CircleCI account. Environment variable name should be `PF_CLIENT_ID`.
+ 
+`Client Secret` : You should add as an environment variable under your CircleCI account. Environment variable name should be `PF_CLIENT_SECRET`. 
+
 ## Usage
-This is full example configuration
+
+You can run a test with below configuration
 
 ```
 version: 2.1
 orbs:
-  preflight: preflight/test-runner@1.0.3
-jobs:
-  build:
-    docker: 
-      - image: circleci/node:9.0.0
-    steps:
-      - preflight/run-tests:
-          clientId: '<preflight-client-id>'
-          clientSecret: '<preflight-client-secret>'
-          testId: '<test-id>'
-          groupId: '<test-group-id>'
-          environmentId: '<test-environment-id>'
-          platforms: 'win-chrome,win-ie'
-          sizes: '1920x1080,1440x900'
+  preflight: preflight/test-runner@1.0
+workflows:
+  run-a-test:
+    jobs:
+      - preflight/run_a_test:
+          testId: "<test-id>"
+          environmentId: ""
+          platforms: ""
+          sizes: ""
           captureScreenshots: true
-          waitResults: false
+          waitResults: true
 ```
 
-`clientId (optional)` : Preflight Client Id. You can pass as a paramater or you can add it as an environment variable under your CircleCI account. Environment name should be `PF_CLIENT_ID`. This is optional if you set a client id environment variable under your CircleCI account. Otherwise you should pass it as a parameter.
- 
-`clientSecret (optional)` : Preflight Client Secret. You can pass as a paramater or you can add it as an environment variable under your CircleCI account. Environment name should be `PF_CLIENT_SECRET`. This is optional if you set a client secret environment variable under your CircleCI account. Otherwise you should pass it as a parameter.
+You can run a group of tests with below configuration.
 
-`testId (optional)` : Pass the Test Id to run. If test id or group id are not passed all the tests will be run.
+```
+version: 2.1
+orbs:
+  preflight: preflight/test-runner@1.0
+workflows:
+  run-group-test:
+    jobs:
+      - preflight/run_group_test:
+          groupId: '<group-id>'
+          environmentId: ""
+          platforms: ""
+          sizes: ""
+          captureScreenshots: true
+          waitResults: true
+```
 
-`groupId (optional)` : Pass the Group Id to run. If test id or group id are not passed all the tests will be run. You can get it from [Test Settings > Groups](https://app.preflight.com/tests/settings/groups) under your PreFlight account.
+You can run all your PreFlight tests with below configuration.
+
+```
+version: 2.1
+orbs:
+  preflight: preflight/test-runner@1.0
+workflows:
+  run-all-tests:
+    jobs:
+      - preflight/run_all_tests:
+          environmentId: ""
+          platforms: ""
+          sizes: ""
+          captureScreenshots: true
+          waitResults: true
+```
+
+
+`testId` : Pass the Test Id to run. If test id and group id are not passed all the tests will be run.
+
+`groupId` : Pass the Group Id to run. If test id and group id are not passed all the tests will be run. You can get it from [Test Settings > Groups](https://app.preflight.com/tests/settings/groups) under your PreFlight account.
 
 `environmentId (optional)` : Environment ID for your test group. You can get it from [Test Settings > Environments](https://app.preflight.com/tests/settings/environments) under your PreFlight account.
 
@@ -81,4 +113,6 @@ If you need to change something in the orb.yml file, you can follow below steps 
   
   2. Run this command to publish CircleCI Registry.
       `circleci orb publish orb.yml preflight/test-runner@<version-number>`
+      or
+      `circleci orb publish increment orb.yml preflight/test-runner patch`
 
