@@ -52,9 +52,9 @@ examples:
       orbs:
         preflight: preflight/test-runner@1.0
       workflows:
-        run-a-test:
+        run-all-tests:
           jobs:
-            - preflight/run_a_test:
+            - preflight/run_all_tests:
                 environmentId: ""
                 platforms: ""
                 sizes: ""
