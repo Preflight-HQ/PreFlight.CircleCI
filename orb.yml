@@ -243,13 +243,12 @@ commands:
               done
               fi
 
-              REQUEST_PATH=""
+              REQUEST_PATH="Run"
               if [ -n "$TEST_ID" ]
               then 
               REQUEST_PATH=$TEST_ID"/Run"
               elif [ -n "$GROUP_ID" ]
               then 
-              REQUEST_PATH="Run"
               RUN_REQUEST_BODY=$(echo $RUN_REQUEST_BODY | jq -r --arg GRPID $GROUP_ID '. += {groupId: $GRPID}')
               fi
 
